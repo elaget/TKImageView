@@ -76,6 +76,7 @@ typedef NS_ENUM(NSInteger, TKMidLineType) {
         default:
             break;
     }
+    
     CGContextRef ctx = CGBitmapContextCreate(NULL, self.size.width, self.size.height,
                                              CGImageGetBitsPerComponent(self.CGImage), 0,
                                              CGImageGetColorSpace(self.CGImage),
@@ -100,17 +101,47 @@ typedef NS_ENUM(NSInteger, TKMidLineType) {
     return img;
     
 }
-- (UIImage *)imageAtRect:(CGRect)rect
+- (UIImage *)imageAtRect:(CGRect)rect rotation:(CGFloat)degrees
 {
     
     UIImage *fixedImage = [self fixOrientation];
     CGImageRef imageRef = CGImageCreateWithImageInRect([fixedImage CGImage], rect);
     UIImage* subImage = [UIImage imageWithCGImage: imageRef];
     CGImageRelease(imageRef);
+    UIImage* rotatedImage = [subImage rotateImageByRadian:(degrees * (M_PI / 180))];
     
-    return subImage;
-    
+    return rotatedImage;
 }
+
+- (UIImage *)rotateImageByRadian:(CGFloat)radian
+{
+    // calculate the size of the rotated view's containing box for our drawing space
+    //UIView *rotatedViewBox = [[UIView alloc] initWithFrame:CGRectMake(0,0, src.size.width, src.size.height)];
+    //CGAffineTransform t = CGAffineTransformMakeRotation(radian);
+    //rotatedViewBox.transform = t;
+    //CGSize rotatedSize = rotatedViewBox.frame.size;
+    CGRect rect = CGRectApplyAffineTransform(CGRectMake(0,0, self.size.width, self.size.height), CGAffineTransformMakeRotation(radian));
+    CGSize rotatedSize = rect.size;
+    
+    // Create the bitmap context
+    UIGraphicsBeginImageContext(rotatedSize);
+    CGContextRef bitmap = UIGraphicsGetCurrentContext();
+    
+    // Move the origin to the middle of the image so we will rotate and scale around the center.
+    CGContextTranslateCTM(bitmap, rotatedSize.width/2, rotatedSize.height/2);
+    
+    //   // Rotate the image context
+    CGContextRotateCTM(bitmap, radian);
+    
+    // Now, draw the rotated/scaled image into the context
+    CGContextScaleCTM(bitmap, 1.0, -1.0);
+    CGContextDrawImage(bitmap, CGRectMake(-self.size.width / 2, -self.size.height / 2, self.size.width, self.size.height), [self CGImage]);
+    
+    UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return newImage;
+}
+
 @end
 @interface CornerView: UIView
 
@@ -456,6 +487,7 @@ typedef NS_ENUM(NSInteger, TKMidLineType) {
 @property (assign, nonatomic) CGFloat paddingTopBottom;
 @property (assign, nonatomic) CGFloat imageAspectRatio;
 @property (assign, nonatomic, readonly) CGFloat cornerMargin;
+@property (assign, nonatomic) CGFloat currentRotatioDegrees;
 @end
 @implementation TKImageView
 
@@ -1135,9 +1167,29 @@ typedef NS_ENUM(NSInteger, TKMidLineType) {
 - (UIImage *)currentCroppedImage {
     
     CGFloat scaleFactor = WIDTH(_imageView) / _toCropImage.size.width;
-    return [_toCropImage imageAtRect: CGRectMake((MINX(_cropAreaView) + _cropAreaBorderLineWidth) / scaleFactor, (MINY(_cropAreaView) + _cropAreaBorderLineWidth) / scaleFactor, (WIDTH(_cropAreaView) - 2 * _cropAreaBorderLineWidth) / scaleFactor, (HEIGHT(_cropAreaView) - 2 * _cropAreaBorderLineWidth) / scaleFactor)];
+    return [_toCropImage imageAtRect: CGRectMake((MINX(_cropAreaView) + _cropAreaBorderLineWidth) / scaleFactor, (MINY(_cropAreaView) + _cropAreaBorderLineWidth) / scaleFactor, (WIDTH(_cropAreaView) - 2 * _cropAreaBorderLineWidth) / scaleFactor, (HEIGHT(_cropAreaView) - 2 * _cropAreaBorderLineWidth) / scaleFactor) rotation:_currentRotatioDegrees];
     
 }
+
+- (void) resetRotation {
+    _currentRotatioDegrees = 0;
+    _imageView.transform = CGAffineTransformMakeRotation(0);
+    _imageAspectRatio = _imageView.frame.size.width / _imageView.frame.size.height;
+    [self resetImageView];
+    [self resetCropAreaByAspectRatio];
+}
+
+- (void) rotateImage:(CGFloat)degrees {
+    _currentRotatioDegrees = _currentRotatioDegrees + degrees;
+    _currentRotatioDegrees = _currentRotatioDegrees >= 360 ? _currentRotatioDegrees - 360 : _currentRotatioDegrees;
+    
+    _imageView.transform = CGAffineTransformMakeRotation((_currentRotatioDegrees/90) * M_PI_2);
+    
+    _imageAspectRatio = _imageView.frame.size.width / _imageView.frame.size.height;
+    [self resetImageView];
+    [self resetCropAreaByAspectRatio];
+}
+
 @end
 
 

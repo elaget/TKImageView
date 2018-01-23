@@ -32,5 +32,9 @@ typedef NS_ENUM(NSInteger, TKCropAreaCornerStyle) {
 @property (strong, nonatomic) UIColor *maskColor;
 @property (assign, nonatomic) BOOL cornerBorderInImage;
 @property (assign, nonatomic) CGFloat initialScaleFactor;
+
 - (UIImage *)currentCroppedImage;
+- (void) resetRotation;
+- (void) rotateImage:(CGFloat)degrees;
+
 @end
